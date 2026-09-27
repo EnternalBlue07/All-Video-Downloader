@@ -18,9 +18,14 @@ import {
   Music,
   Image,
   ChevronDown,
-  Check
+  Check,
+  ShieldCheck
 } from 'lucide-react';
 import { MediaItem, api } from '../api';
+import { ProvenanceClaim, OutputVerification, formatTimeMs } from '../timeline';
+import { ProvenanceModal } from '../components/ProvenanceModal';
+import { VerificationBadge } from '../components/VerificationBadge';
+
 
 interface MediaDetailViewProps {
   mediaId: string;
@@ -51,9 +56,17 @@ export const MediaDetailView: React.FC<MediaDetailViewProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [transcriptSearch, setTranscriptSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'transcript' | 'ask' | 'dna' | 'knowledge'>('transcript');
+  const [activeTab, setActiveTab] = useState<'transcript' | 'provenance' | 'ask' | 'dna' | 'knowledge'>('transcript');
   const [playerMode, setPlayerMode] = useState<'youtube' | 'local'>('youtube');
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Phase 1: Provenance & Output Verification state
+  const [provenanceClaims, setProvenanceClaims] = useState<ProvenanceClaim[]>([]);
+  const [selectedClaim, setSelectedClaim] = useState<ProvenanceClaim | null>(null);
+  const [claimInput, setClaimInput] = useState('');
+  const [isVerifyingClaim, setIsVerifyingClaim] = useState(false);
+  const [verification, setVerification] = useState<OutputVerification | null>(null);
+  const [isVerifyingOutput, setIsVerifyingOutput] = useState(false);
 
   // Ask This Video state
   const [question, setQuestion] = useState('');
@@ -72,7 +85,7 @@ export const MediaDetailView: React.FC<MediaDetailViewProps> = ({
   const ytPlayerRef = useRef<any>(null);
   const html5VideoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Load media details
+  // Load media details & Phase 1 records
   useEffect(() => {
     setIsLoading(true);
     api.getMediaDetail(mediaId)
@@ -84,7 +97,45 @@ export const MediaDetailView: React.FC<MediaDetailViewProps> = ({
         console.error(err);
         setIsLoading(false);
       });
+
+    api.getProvenance(mediaId)
+      .then(res => setProvenanceClaims(res.claims || []))
+      .catch(() => {});
+
+    api.getVerification(mediaId)
+      .then(res => {
+        if (res && res.verified !== undefined) setVerification(res);
+      })
+      .catch(() => {});
   }, [mediaId]);
+
+  const handleVerifyClaim = async () => {
+    if (!claimInput.trim()) return;
+    setIsVerifyingClaim(true);
+    try {
+      const res = await api.verifyClaim(mediaId, claimInput);
+      setSelectedClaim(res);
+      setProvenanceClaims(prev => [res, ...prev.filter(c => c.id !== res.id)]);
+      setClaimInput('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsVerifyingClaim(false);
+    }
+  };
+
+  const handleVerifyOutput = async () => {
+    setIsVerifyingOutput(true);
+    try {
+      const res = await api.verifyOutput(mediaId);
+      setVerification(res);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsVerifyingOutput(false);
+    }
+  };
+
 
   const ytId = media?.url ? getYouTubeId(media.url) : null;
 
@@ -499,6 +550,20 @@ export const MediaDetailView: React.FC<MediaDetailViewProps> = ({
               )}
             </div>
 
+            {/* Phase 1: Output Integrity Verification */}
+            <VerificationBadge
+              verification={verification}
+              onReverify={handleVerifyOutput}
+              isLoading={isVerifyingOutput}
+            />
+
+            <button
+              className="btn-secondary"
+              onClick={() => setActiveTab('provenance')}
+              style={{ gap: '6px' }}
+            >
+              <ShieldCheck size={14} color="var(--accent-lime)" /> Provenance ({provenanceClaims.length})
+            </button>
             <button
               className="btn-secondary"
               onClick={() => onOpenClipStudio(media.id)}
@@ -735,6 +800,129 @@ export const MediaDetailView: React.FC<MediaDetailViewProps> = ({
             </div>
           )}
 
+          {/* TAB: PROVENANCE & GROUNDING LEDGER */}
+          {activeTab === 'provenance' && (
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', height: '620px', overflowY: 'auto' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldCheck size={16} color="var(--accent-lime)" />
+                    Provenance & Grounding Ledger
+                  </h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Frame-Accurate Millisecond Tracking
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Every AI assertion is strictly verified against real spoken transcripts. Never hallucinated.
+                </p>
+              </div>
+
+              {/* Verify New Claim Input Box */}
+              <div style={{ background: 'var(--surface-secondary)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Verify Statement Against This Video
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    className="media-input-field"
+                    placeholder="Enter any statement (e.g. 'JWT rotation is recommended for session security')..."
+                    value={claimInput}
+                    onChange={e => setClaimInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleVerifyClaim()}
+                    style={{ fontSize: '12.5px' }}
+                  />
+                  <button
+                    className="btn-primary"
+                    onClick={handleVerifyClaim}
+                    disabled={isVerifyingClaim || !claimInput.trim()}
+                    style={{ whiteSpace: 'nowrap', fontSize: '12px', padding: '6px 14px' }}
+                  >
+                    {isVerifyingClaim ? 'Verifying...' : 'Verify Claim'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Verified Claims List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Grounded Claims ({provenanceClaims.length})
+                </div>
+
+                {provenanceClaims.length === 0 ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', background: 'rgba(255,255,255,0.01)', borderRadius: '8px' }}>
+                    No provenance claims generated yet. Type a statement above to test real-time grounding.
+                  </div>
+                ) : (
+                  provenanceClaims.map(c => {
+                    const isV = c.status === 'VERIFIED' || c.status === 'HIGH_CONFIDENCE';
+                    const isIns = c.status === 'INSUFFICIENT_EVIDENCE';
+                    return (
+                      <div
+                        key={c.id}
+                        style={{
+                          background: 'var(--surface-secondary)',
+                          borderRadius: '8px',
+                          border: isV ? '1px solid rgba(16, 185, 129, 0.4)' : isIns ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border-color)',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: isV ? '#10b981' : isIns ? '#ef4444' : '#f59e0b',
+                              background: isV ? 'rgba(16, 185, 129, 0.12)' : isIns ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                              padding: '2px 8px',
+                              borderRadius: '4px'
+                            }}
+                          >
+                            {isV ? 'SOURCE VERIFIED ✓' : isIns ? 'INSUFFICIENT EVIDENCE' : c.status} • {Math.round(c.confidence * 100)}%
+                          </span>
+                          <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#38bdf8' }}>
+                            {c.start_str || formatTimeMs(c.start_ms)} → {c.end_str || formatTimeMs(c.end_ms)}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '13px', color: '#f1f5f9', fontWeight: 600 }}>
+                          "{c.claim_text}"
+                        </div>
+
+                        <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', background: 'rgba(0,0,0,0.25)', padding: '8px', borderRadius: '4px' }}>
+                          {c.evidence_text}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '6px' }}>
+                          <button
+                            className="btn-ghost"
+                            onClick={() => setSelectedClaim(c)}
+                            style={{ fontSize: '11px', padding: '2px 6px' }}
+                          >
+                            Inspect Details
+                          </button>
+                          {!isIns && (
+                            <button
+                              className="btn-secondary"
+                              onClick={() => seekToSeconds(c.start_ms / 1000)}
+                              style={{ gap: '6px', fontSize: '11px', padding: '4px 10px', color: '#10b981' }}
+                            >
+                              <Play size={12} fill="#10b981" /> Play Source
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 2: ASK THIS VIDEO (CLICK CITATION SEEKS REAL VIDEO) */}
           {activeTab === 'ask' && (
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', height: '620px', overflowY: 'auto' }}>
@@ -898,6 +1086,16 @@ export const MediaDetailView: React.FC<MediaDetailViewProps> = ({
           )}
         </div>
       </div>
+
+
+      {/* Phase 1: Provenance Source Verification Modal */}
+      <ProvenanceModal
+        claim={selectedClaim}
+        videoTitle={media.title}
+        onClose={() => setSelectedClaim(null)}
+        onPlaySource={(startMs) => seekToSeconds(startMs / 1000)}
+      />
     </div>
   );
 };
+

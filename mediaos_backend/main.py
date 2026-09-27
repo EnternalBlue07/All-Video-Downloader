@@ -24,6 +24,11 @@ from ingest import inspect_url, start_ingest_job, cancel_job, job_listeners, dir
 from semantic_search import ask_single_video, ask_library, search_all_transcripts
 from storage_intel import get_storage_stats
 from format_export import resolve_media_export, build_content_disposition, sanitize_title
+from timeline import TimelineRange, parse_time_to_ms, format_time_ms, normalize_transcript_segments
+from provenance import record_provenance_claim, get_provenance_claims, extract_claim_evidence, ProvenanceStatus
+from verifier import verify_output_asset, get_latest_verification
+from recovery import reconcile_startup_jobs, find_orphaned_fragments, clean_orphaned_fragments
+
 
 app = FastAPI(
     title="MEDIAOS Intelligence Engine",
@@ -88,6 +93,15 @@ class BuildCourseRequest(BaseModel):
     title: str
     description: str = ""
     media_ids: List[str]
+
+class VerifyClaimRequest(BaseModel):
+    media_id: str
+    claim_text: str
+
+class VerifyOutputRequest(BaseModel):
+    file_path: Optional[str] = None
+    expected_duration: Optional[float] = None
+
 
 # ----------------- Endpoints -----------------
 
@@ -853,3 +867,176 @@ async def events():
                 job_listeners.remove(queue)
                 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ==============================================================================
+# PHASE 1: TRUST & RELIABILITY ENDPOINTS
+# Canonical Timeline, Provenance Ledger, Output Verification & Recovery
+# ==============================================================================
+
+@app.on_event("startup")
+def on_app_startup():
+    """Performs crash recovery reconciliation and database checks."""
+    try:
+        report = reconcile_startup_jobs()
+        if report["interrupted_count"] > 0:
+            print(f"[RECOVERY] Reconciled {report['interrupted_count']} interrupted jobs on startup.")
+    except Exception as e:
+        print(f"[RECOVERY] Startup check error: {e}")
+
+
+@app.get("/api/media/{media_id}/timeline")
+def get_media_timeline(media_id: str):
+    """
+    Returns canonical millisecond-accurate timeline segments for any media item.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, transcript FROM media WHERE id = ?", (media_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Media asset not found")
+
+    try:
+        raw_cues = json.loads(row["transcript"] or "[]")
+    except Exception:
+        raw_cues = []
+
+    norm = normalize_transcript_segments(raw_cues)
+    return {
+        "media_id": media_id,
+        "total_segments": len(norm),
+        "segments": norm
+    }
+
+
+@app.get("/api/media/{media_id}/provenance")
+def get_media_provenance(media_id: str):
+    """
+    Returns all verifiable AI claims and grounded transcript spans for an asset.
+    """
+    claims = get_provenance_claims(media_id)
+    return {
+        "media_id": media_id,
+        "total_claims": len(claims),
+        "claims": claims
+    }
+
+
+@app.post("/api/provenance/verify")
+def verify_claim_endpoint(req: VerifyClaimRequest):
+    """
+    Validates an AI statement against real media transcripts.
+    Guarantees: If evidence is missing, returns INSUFFICIENT_EVIDENCE without hallucination.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, dna, transcript FROM media WHERE id = ?", (req.media_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Media asset not found")
+
+    dna_str = "DNA-UNKNOWN"
+    try:
+        dna_obj = json.loads(row["dna"] or "{}")
+        dna_str = dna_obj.get("content_identity", {}).get("fingerprint", "DNA-UNKNOWN")
+    except Exception:
+        pass
+
+    try:
+        raw_cues = json.loads(row["transcript"] or "[]")
+    except Exception:
+        raw_cues = []
+
+    result = record_provenance_claim(
+        source_media_id=req.media_id,
+        media_dna=dna_str,
+        claim_text=req.claim_text,
+        segments=raw_cues,
+        transcription_model="whisper-base-local",
+        analysis_model="mediaos-provenance-v1"
+    )
+    result["media_title"] = row["title"]
+    return result
+
+
+@app.post("/api/media/{media_id}/verify-output")
+def verify_output_endpoint(media_id: str, req: VerifyOutputRequest):
+    """
+    Performs rigorous container, audio/video stream, and duration verification via ffprobe.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, duration, file_path FROM media WHERE id = ?", (media_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Media asset not found")
+
+    target_path = req.file_path or row["file_path"]
+    expected_dur = req.expected_duration or float(row["duration"] or 0)
+
+    report = verify_output_asset(
+        file_path=target_path,
+        asset_id=media_id,
+        asset_type="media",
+        expected_duration_seconds=expected_dur,
+        require_video=True,
+        require_audio=True
+    )
+    return report
+
+
+@app.get("/api/media/{media_id}/verification")
+def get_verification_report(media_id: str):
+    """
+    Fetches the latest ffprobe output verification record for an asset.
+    """
+    report = get_latest_verification(media_id)
+    if not report:
+        return {"verified": False, "status": "unverified", "message": "No verification run on this asset yet."}
+    return report
+
+
+@app.get("/api/recovery/interrupted")
+def get_interrupted_jobs():
+    """
+    Returns all interrupted downloads and orphaned fragment files.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT id, media_id, url, title, thumbnail, stage, progress, quality, created_at
+    FROM jobs
+    WHERE stage = 'interrupted'
+    ORDER BY created_at DESC
+    """)
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    orphaned = find_orphaned_fragments()
+    return {
+        "interrupted_jobs": rows,
+        "interrupted_count": len(rows),
+        "orphaned_fragments": orphaned,
+        "orphaned_count": len(orphaned)
+    }
+
+
+@app.post("/api/recovery/reconcile")
+def trigger_reconciliation():
+    """Manually triggers startup reconciliation for interrupted jobs."""
+    return reconcile_startup_jobs()
+
+
+@app.post("/api/recovery/clean-fragments")
+def clean_fragments_endpoint():
+    """Cleans up dangling .part and .tmp files from cancelled/interrupted downloads."""
+    cleaned = clean_orphaned_fragments()
+    return {"status": "success", "cleaned_count": cleaned}
+

@@ -114,7 +114,66 @@ def init_db():
             transcript_text
         );
         """)
-        
+
+        # Phase 1: Provenance & Grounding Claims Ledger
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS provenance_claims (
+            id TEXT PRIMARY KEY,
+            source_media_id TEXT,
+            media_dna TEXT,
+            claim_text TEXT,
+            transcript_segment_ids TEXT,
+            start_ms INTEGER,
+            end_ms INTEGER,
+            confidence REAL,
+            evidence_text TEXT,
+            transcription_model TEXT,
+            analysis_model TEXT,
+            status TEXT DEFAULT 'VERIFIED',
+            created_at TEXT
+        );
+        """)
+
+        # Phase 1: Output Verifications
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS output_verifications (
+            id TEXT PRIMARY KEY,
+            asset_type TEXT,
+            asset_id TEXT,
+            file_path TEXT,
+            file_size INTEGER,
+            format_name TEXT,
+            duration_ms INTEGER,
+            has_video INTEGER,
+            has_audio INTEGER,
+            video_codec TEXT,
+            audio_codec TEXT,
+            video_resolution TEXT,
+            stream_count INTEGER,
+            verified INTEGER DEFAULT 0,
+            error_message TEXT,
+            verified_at TEXT
+        );
+        """)
+
+        # Phase 1: Normalized Timeline Segments
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS timeline_segments (
+            id TEXT PRIMARY KEY,
+            media_id TEXT,
+            segment_index INTEGER,
+            start_ms INTEGER,
+            end_ms INTEGER,
+            text TEXT,
+            speaker TEXT DEFAULT 'Speaker 01',
+            confidence REAL DEFAULT 1.0,
+            created_at TEXT
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timeline_ms ON timeline_segments(media_id, start_ms, end_ms);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_prov_media ON provenance_claims(source_media_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ver_asset ON output_verifications(asset_id);")
+
         conn.commit()
         conn.close()
 

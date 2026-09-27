@@ -349,5 +349,57 @@ export const api = {
   async getExportOptions(mediaId: string) {
     const res = await fetch(`${API_BASE}/media/${mediaId}/export-options`);
     return res.json();
+  },
+
+  // Phase 1: Canonical Timeline & Provenance
+  async getTimeline(mediaId: string) {
+    const res = await fetch(`${API_BASE}/media/${mediaId}/timeline`);
+    return res.json();
+  },
+
+  async getProvenance(mediaId: string) {
+    const res = await fetch(`${API_BASE}/media/${mediaId}/provenance`);
+    return res.json();
+  },
+
+  async verifyClaim(mediaId: string, claimText: string) {
+    const res = await fetch(`${API_BASE}/provenance/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ media_id: mediaId, claim_text: claimText })
+    });
+    return res.json();
+  },
+
+  // Phase 1: Output Integrity Verification
+  async verifyOutput(mediaId: string) {
+    const res = await fetch(`${API_BASE}/media/${mediaId}/verify-output`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    return res.json();
+  },
+
+  async getVerification(mediaId: string) {
+    const res = await fetch(`${API_BASE}/media/${mediaId}/verification`);
+    return res.json();
+  },
+
+  // Phase 1: Crash Recovery & Orphan Cleanup
+  async getInterruptedJobs() {
+    const res = await fetch(`${API_BASE}/recovery/interrupted`);
+    return res.json();
+  },
+
+  async reconcileJobs() {
+    const res = await fetch(`${API_BASE}/recovery/reconcile`, { method: 'POST' });
+    return res.json();
+  },
+
+  async cleanFragments() {
+    const res = await fetch(`${API_BASE}/recovery/clean-fragments`, { method: 'POST' });
+    return res.json();
   }
 };
+

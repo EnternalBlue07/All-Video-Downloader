@@ -16,6 +16,9 @@ from db import get_connection
 from intelligence import generate_ai_analysis
 from dna import generate_media_dna, check_duplicate
 from semantic_search import index_media_fts
+from verifier import verify_output_asset
+from timeline import normalize_transcript_segments
+
 
 job_listeners: List[Any] = []
 cancelled_jobs = set()
@@ -436,10 +439,41 @@ def run_ingest_pipeline(job_id: str, media_id: str, url: str, title: str, creato
             transcript=ai_data["transcript"],
             existing_conn=conn
         )
-        
-        # Stage 9: COMPLETE
+
+        # Phase 1: Output Integrity Verification via ffprobe
+        final_file_path = downloaded_file or f"downloads/{media_id}.mp4"
+        v_rep = verify_output_asset(
+            file_path=final_file_path,
+            asset_id=media_id,
+            asset_type="media",
+            expected_duration_seconds=real_duration,
+            require_video=True,
+            require_audio=True
+        )
+
+        # Phase 1: Index normalized millisecond timeline segments
+        norm_segs = normalize_transcript_segments(ai_data.get("transcript", []))
+        for seg in norm_segs:
+            cursor.execute("""
+            INSERT OR REPLACE INTO timeline_segments (
+                id, media_id, segment_index, start_ms, end_ms, text, speaker, confidence, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                f"{media_id}_{seg['id']}",
+                media_id,
+                seg["segment_index"],
+                seg["start_ms"],
+                seg["end_ms"],
+                seg["text"],
+                seg.get("speaker", "Speaker 01"),
+                seg.get("confidence", 0.95),
+                created_at
+            ))
+
+        # Stage 9: COMPLETE (Output Verified)
         update_job("completed", 100.0, "Complete", "00:00", f"{round(file_size_on_disk / (1024**2))} MB")
         cursor.execute("UPDATE jobs SET stage = 'completed', progress = 100.0, speed = 'Complete', eta = '00:00' WHERE id = ?", (job_id,))
+
         conn.commit()
         notify_job_update({
             "id": job_id,
