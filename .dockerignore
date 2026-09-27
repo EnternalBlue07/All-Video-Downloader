@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+*.pyc
+__pycache__
+*.db-journal
+.DS_Store
+Thumbs.db
+devscripts
+test
+*.log
+mediaos_backend/storage/*.db-shm
+mediaos_backend/storage/*.db-wal

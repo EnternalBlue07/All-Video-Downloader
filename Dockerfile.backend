@@ -1,0 +1,35 @@
+# Production Dockerfile for MEDIAOS Backend & Ingestion Engine
+# Built by Mohammad Zumaan Sayyed
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies & FFmpeg
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements & install
+COPY mediaos_backend/requirements.txt /app/mediaos_backend/requirements.txt
+RUN pip install --no-cache-dir -r mediaos_backend/requirements.txt
+
+# Copy repository code
+COPY yt_dlp /app/yt_dlp
+COPY mediaos_backend /app/mediaos_backend
+COPY pyproject.toml /app/
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV MEDIAOS_HOST=0.0.0.0
+ENV MEDIAOS_PORT=8000
+
+# Create persistent storage directories
+RUN mkdir -p /app/mediaos_backend/storage /app/mediaos_backend/downloads/exports
+
+EXPOSE 8000
+
+CMD ["uvicorn", "mediaos_backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

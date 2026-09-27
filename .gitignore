@@ -132,3 +132,16 @@ yt-dlp-plugins
 
 # Packages
 yt_dlp_ejs/
+
+# MEDIAOS Production Ignores
+.env
+mediaos-ui/node_modules/
+mediaos-ui/dist/
+mediaos_backend/storage/*.db
+mediaos_backend/storage/*.db-shm
+mediaos_backend/storage/*.db-wal
+mediaos_backend/storage/*.db-journal
+mediaos_backend/downloads/*
+!mediaos_backend/downloads/.gitkeep
+!mediaos_backend/storage/.gitkeep
+
