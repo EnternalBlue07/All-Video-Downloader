@@ -60,8 +60,9 @@ cookies
 *.webm
 *.webp
 
-# Allow config/media files in testdata
+# Allow config/media files in testdata and documentation assets
 !test/**
+!docs/assets/**
 
 # Python
 *.pyc

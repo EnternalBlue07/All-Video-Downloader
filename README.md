@@ -28,6 +28,7 @@
 ---
 
 [🚀 Quick Start](#-quick-start) •
+[🎬 Video Walkthrough](#-system-tour--video-walkthrough) •
 [🏛 Architecture](#-system-architecture) •
 [✨ Key Pillars](#-key-pillars--features) •
 [🎬 Clip Studio](#-vertical-clip-studio) •
@@ -38,6 +39,30 @@
 ---
 
 </div>
+
+## 🎬 System Tour & Video Walkthrough
+
+Experience MEDIAOS in action across ingestion, cryptographic verification, transcript radar search, vertical AI re-framing, and multi-format transmuxing:
+
+<div align="center">
+  <img src="docs/assets/mediaos_guide.gif" alt="MEDIAOS Interactive System Tour & Animated Demonstration" width="100%" style="border-radius: 14px; box-shadow: 0 25px 80px rgba(0,0,0,0.85); border: 1px solid rgba(168,85,247,0.3);" />
+
+  <p align="center" style="margin-top: 10px;">
+    🎥 <b>HD Master Video:</b> <a href="docs/assets/mediaos_demo.mp4"><b><code>docs/assets/mediaos_demo.mp4</code></b></a> (1080x620 • 60 FPS • H.264 Master File)
+  </p>
+</div>
+
+| Module | Timeline | Architecture & Engine Highlight |
+|---|---|---|
+| **01** | `00:00 - 00:02` | **Autonomous Ingestion Engine**: 4K AV01 stream probe, Opus 160k demux, SponsorBlock, ffprobe output verification |
+| **02** | `00:02 - 00:04` | **Media DNA & Provenance**: Dual-vector SHA-256 + 64-bit pHash, 30fps canonical timeline, anti-hallucination grounding |
+| **03** | `00:04 - 00:06` | **Neural Transcript & FTS5 Radar**: SQLite FTS5 BM25 search across dialog vectors with 1-click millisecond seek |
+| **04** | `00:06 - 00:08` | **Vertical Clip Studio (16:9 → 9:16)**: Centroid face tracking, portrait reframing, and animated kinetic subtitles |
+| **05** | `00:08 - 00:10` | **Universal Transcoder & Exporter**: MP4, MKV, MP3, FLAC, SRT matrix with RFC 6266/5987 Unicode headers |
+
+> 💡 **In-App Interactive Tour:** You can also launch this tour interactively inside the web app at any time with full procedural Web Audio synth sound effects by clicking **`🎬 Interactive Guide`** in the top navigation bar.
+
+---
 
 ## 🌟 Executive Summary
 
