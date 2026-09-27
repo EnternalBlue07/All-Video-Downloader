@@ -84,6 +84,16 @@
 * **Limitations:** Integration tests on live YouTube streams require active internet connectivity.
 * **Last Verified:** 2026-09-27
 
+### 6. Interactive Video Guide & Architectural Walkthrough Modal
+* **Status:** `VERIFIED`
+* **Files:**
+  * Frontend: `mediaos-ui/src/components/InteractiveGuideModal.tsx`
+  * UI Integration: `mediaos-ui/src/components/Topbar.tsx`, `mediaos-ui/src/views/OverviewView.tsx`, `mediaos-ui/src/App.tsx`
+  * Styling: `mediaos-ui/src/index.css`
+* **Features:** 5-stage animated simulation tour (Ingest Engine, Media DNA & Provenance, FTS5 Semantic Search, Clip Studio 9:16 Crop, Universal Exporter) with Web Audio API sound synthesizer, 60fps HUD scanlines, live terminal stdout stream, scrubber timeline, speed controls (0.5x-2x), keyboard shortcuts, and direct feature launching.
+* **Verification Evidence:** `tsc -b && vite build` built in 1.22s, ESLint 0 errors, browser hot reload tested.
+* **Last Verified:** 2026-09-27
+
 ---
 
 ## Phase 2 — Intelligence (Upcoming)

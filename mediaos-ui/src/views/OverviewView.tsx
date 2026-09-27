@@ -9,6 +9,7 @@ interface OverviewViewProps {
   onDirectIngest: (url: string) => Promise<void>;
   onSelectMedia: (id: string) => void;
   onNavigateToView: (view: string) => void;
+  onOpenGuide?: () => void;
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
@@ -17,7 +18,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onInspectUrl,
   onDirectIngest,
   onSelectMedia,
-  onNavigateToView
+  onNavigateToView,
+  onOpenGuide
 }) => {
   const [inputVal, setInputVal] = useState('');
   const [isIngestingDirectly, setIsIngestingDirectly] = useState(false);
@@ -64,8 +66,85 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </p>
       </div>
 
+      {/* Interactive Video Tour Banner */}
+      <div
+        onClick={onOpenGuide}
+        style={{
+          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(16, 185, 129, 0.1) 100%)',
+          border: '1px solid rgba(168, 85, 247, 0.35)',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.3), 0 0 25px rgba(168, 85, 247, 0.1)',
+          transition: 'all 0.25s ease'
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.6)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.35)';
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div
+            style={{
+              width: '46px',
+              height: '46px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #a855f7, #3b82f6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)'
+            }}
+          >
+            <Play size={20} fill="#fff" />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc' }}>
+                New to MEDIAOS? Watch the Interactive System Guide
+              </span>
+              <span style={{ fontSize: '10px', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+                HD ANIMATED
+              </span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+              See how URL ingestion, Media DNA fingerprinting, Provenance grounding, and Clip Studio work together in 2 minutes.
+            </p>
+          </div>
+        </div>
+
+        <button
+          className="btn-primary"
+          style={{
+            background: 'linear-gradient(135deg, #a855f7, #3b82f6)',
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: '12px',
+            padding: '8px 18px',
+            borderRadius: '8px',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 0 15px rgba(168, 85, 247, 0.3)'
+          }}
+        >
+          <span>Launch Video Tour</span>
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
       {/* Primary Command Area */}
       <div className="technical-card" style={{ padding: '20px' }}>
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <div style={{ fontSize: '11px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
             MEDIA INGESTION & PIPELINE ENGINE

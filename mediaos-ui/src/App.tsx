@@ -3,6 +3,8 @@ import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { CommandBar } from './components/CommandBar';
 import { MediaInspectorModal } from './components/MediaInspectorModal';
+import { InteractiveGuideModal } from './components/InteractiveGuideModal';
+
 
 import { OverviewView } from './views/OverviewView';
 import { LibraryView } from './views/LibraryView';
@@ -32,6 +34,10 @@ export function App() {
   const [isQuickIngestOpen, setIsQuickIngestOpen] = useState(false);
   const [quickIngestUrl, setQuickIngestUrl] = useState('');
   const [isQuickIngestSubmitting, setIsQuickIngestSubmitting] = useState(false);
+
+  // Interactive Video Guide modal state
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+
 
   // State data
   const [activeJobs, setActiveJobs] = useState<IngestJob[]>([]);
@@ -202,7 +208,9 @@ export function App() {
           pageTitle={getPageTitle()}
           onOpenCommandBar={() => setIsCommandBarOpen(true)}
           onNewInspect={() => setIsQuickIngestOpen(true)}
+          onOpenGuide={() => setIsGuideOpen(true)}
         />
+
 
         <main className="workspace-scroll">
           {currentView === 'overview' && (
@@ -213,7 +221,9 @@ export function App() {
               onDirectIngest={handleDirectIngest}
               onSelectMedia={handleSelectMedia}
               onNavigateToView={view => setCurrentView(view)}
+              onOpenGuide={() => setIsGuideOpen(true)}
             />
+
           )}
 
           {currentView === 'library' && (
@@ -399,8 +409,17 @@ export function App() {
           </div>
         </div>
       )}
+
+
+      {/* Interactive System Video Guide Modal */}
+      <InteractiveGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+        onNavigateToView={view => setCurrentView(view)}
+      />
     </div>
   );
 }
+
 
 export default App;
